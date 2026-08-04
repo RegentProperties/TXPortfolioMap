@@ -1,0 +1,1156 @@
+<meta charset="UTF-8">
+<title>Texas Portfolio — Location Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+  :root{
+    --ink:#16233D;
+    --ink-soft:#4C5A72;
+    --bg:#F1F4F9;
+    --surface:#FFFFFF;
+    --line:#DCE2EC;
+    --line-soft:#EAEEF5;
+    --navy:#4F5D45;
+    --navy-deep:#333D2C;
+    --amber:#A9682B;
+    --amber-bg:#FBF1E6;
+    --serif: Iowan Old Style, Palatino Linotype, Palatino, Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+  }
+  .page{
+    max-width:1280px;
+    margin:0 auto;
+    padding:36px 28px 64px;
+  }
+  header.report-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:24px;
+    border-bottom:2px solid var(--navy);
+    padding-bottom:18px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  header.report-head h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:30px;
+    margin:0 0 4px;
+    color:var(--navy-deep);
+    text-wrap:balance;
+  }
+  header.report-head .addr{
+    font-size:14px;
+    color:var(--ink-soft);
+    letter-spacing:.02em;
+  }
+  header.report-head .meta{
+    text-align:right;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+  header.report-head .meta strong{
+    color:var(--ink);
+    font-weight:600;
+  }
+
+  section{margin-bottom:34px;}
+
+  h2.section-title{
+    font-family:var(--serif);
+    font-size:19px;
+    font-weight:600;
+    color:var(--navy-deep);
+    margin:0 0 14px;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  h2.section-title small{
+    font-family:var(--sans);
+    font-weight:400;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+
+  .callout{
+    background:var(--amber-bg);
+    border:1px solid #E7CFA9;
+    border-left:4px solid var(--amber);
+    border-radius:3px;
+    padding:14px 18px;
+    font-size:13.5px;
+    color:#5B3E1A;
+    margin-bottom:20px;
+  }
+  .callout strong{color:#3F2A10;}
+
+  .map-shell{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:6px;
+    display:flex;
+    height:640px;
+    overflow:hidden;
+  }
+  #map{flex:1; min-width:0;}
+  .map-sidebar{
+    width:320px; flex-shrink:0;
+    border-left:1px solid var(--line);
+    display:flex; flex-direction:column;
+  }
+  .sidebar-search{
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .sidebar-search input{
+    width:100%;
+    padding:7px 10px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    font-family:var(--sans);
+    font-size:12.5px;
+    color:var(--ink);
+    background:var(--bg);
+  }
+  .sidebar-search input:focus{outline:2px solid var(--navy); outline-offset:1px;}
+  .sidebar-count{
+    font-size:11px; color:var(--ink-soft); padding:6px 14px 0;
+  }
+  .map-list{flex:1; overflow-y:auto;}
+  .map-list::-webkit-scrollbar{width:5px;}
+  .map-list::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+  .map-card{
+    display:flex; gap:11px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--line-soft);
+    cursor:pointer;
+  }
+  .map-card:hover{background:var(--line-soft);}
+  .map-card.selected{background:#EBEEE6; box-shadow:inset 3px 0 0 var(--navy);}
+  .map-card.hidden{display:none;}
+  .map-card .thumb{
+    width:52px; height:52px; flex-shrink:0; border-radius:4px; overflow:hidden;
+    background:var(--line-soft); position:relative;
+  }
+  .map-card .thumb img{width:100%; height:100%; object-fit:cover; display:block; transition:opacity .3s;}
+  .map-card .thumb img.loading{opacity:0;}
+  .map-card .info{min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; gap:2px;}
+  .map-card .mc-name{font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .map-card .mc-sub{font-size:10.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .map-card .mc-flag{font-size:9.5px; color:var(--amber); font-weight:700; text-transform:uppercase; letter-spacing:.03em;}
+  .map-pill{
+    white-space:nowrap; border-radius:20px; padding:2px 7px;
+    font-family:var(--sans); font-size:10.5px; font-weight:700;
+    cursor:pointer; box-shadow:0 2px 6px rgba(14,37,71,.25);
+    transform:translate(-50%,-50%); display:inline-block;
+    transition:transform .12s; user-select:none; line-height:1.4;
+    border:2px solid var(--navy); background:var(--navy); color:#fff;
+  }
+  .map-pill.approx{background:var(--amber); border-color:#7A4B1E;}
+  .map-pill:hover{transform:translate(-50%,-50%) scale(1.15);}
+  .map-pill.sel{transform:translate(-50%,-50%) scale(1.25);}
+  .marker-cluster-custom{
+    background:rgba(79,93,69,.85);
+    border-radius:50%;
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--sans); font-weight:700; font-size:12.5px;
+    box-shadow:0 2px 8px rgba(14,37,71,.35);
+  }
+  .leaflet-popup-content-wrapper{display:none;}
+  .leaflet-container{font-family:var(--sans);}
+
+  footer.notes{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:16px;
+    margin-top:40px;
+  }
+  footer.notes p{margin:0 0 8px;}
+</style>
+
+<div class="page">
+
+  <header class="report-head">
+    <div>
+      <h1>Texas Portfolio — Location Map</h1>
+      <div class="addr">Dallas–Fort Worth &amp; Houston metros &nbsp;·&nbsp; 98 properties</div>
+    </div>
+    <div class="meta">
+      Generated: <strong>8/4/2026</strong><br>
+      Geocoding: <strong>OpenStreetMap Nominatim</strong><br>
+      98 properties mapped, 17 approximate
+    </div>
+  </header>
+
+  <div class="callout">
+    <strong>17 of 98 pins are approximate</strong> (city-center, not the exact rooftop) — either the address supplied had no street number/zip, or no exact street match exists in OpenStreetMap. These are marked in amber on the map and flagged "approx." in the sidebar. See the footer for the full list.
+  </div>
+
+  <section>
+    <h2 class="section-title">Location Map <small>click a marker or list row to focus it; zoom out to see clusters</small></h2>
+    <div class="map-shell">
+      <div id="map"></div>
+      <div class="map-sidebar">
+        <div class="sidebar-search"><input id="filterInput" type="text" placeholder="Filter by name, city, or address…"></div>
+        <div class="sidebar-count" id="sidebarCount"></div>
+        <div class="map-list" id="mapList"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="notes">
+    <p>Markers are numbered to match the order in the source list. Amber markers/rows are approximate (city-level) placements — verify exact coordinates before relying on distance calculations for these properties.</p>
+    <p>Approximate entries: The Hamilton at Garden Valley (105 N McDonald St, Waxahachie, TX 75165); 660 Yorktown (660 Yorktown Dr, Dallas, TX 75208); Cyrene Painted Tree (7100 Painted Tree Pkwy, McKinney, TX 75070); Valor at the Realm (2900 The Realm Pkwy, Lewisville, TX 75056); The Ellis (5601 Destination Way, The Colony, TX 75056); Homes of Prairie Springs (3001 E Trinity Mills Rd, Richardson, TX 75082); Project Alpha - The Abbott (Dallas, TX); Project Alpha - The Abigail (Dallas, TX); Project Alpha - The Abram (Dallas, TX); Project Alpha - The Adriane (Dallas, TX); Project Alpha - The Alona (Dallas, TX); Cortland Stonebriar (4400 Stonebriar Cir, Frisco, TX 75034); Modera Walsh (700 Walsh Ranch Pkwy, Aledo, TX 76008); Theo Allen Gateway (2014 Southside Blvd, Allen, TX); The Waverly (1700 Fairfield Pkwy, Burleson, TX 76028); Villas at Bardin (2914 Spinner Lane, Arlington, TX); Jefferson Railhead (10221 Whistlestop Lane, Frisco, TX 75033)</p>
+  </footer>
+
+</div>
+
+<script>
+// ── Location map (Google Places photos + Leaflet + clustering, same convention as MagnoliaRentSet/GardensLocationMap) ──
+const GKEY = 'AIzaSyBX2gnTMnn0gMzlAv9ZayO2RR3cvoJGqyA';
+
+const MAP_ITEMS = [
+  {
+    "id": 1,
+    "name": "The Atwell",
+    "address": "1100 E Broad St, Mansfield, TX 76063",
+    "lat": 32.56482,
+    "lng": -97.127111,
+    "approx": false
+  },
+  {
+    "id": 2,
+    "name": "The Hamilton at Garden Valley",
+    "address": "105 N McDonald St, Waxahachie, TX 75165",
+    "lat": 32.394491,
+    "lng": -96.843936,
+    "approx": true
+  },
+  {
+    "id": 3,
+    "name": "Galleries at Park Lane",
+    "address": "8000 Park Lane, Dallas, TX 75231",
+    "lat": 32.871781,
+    "lng": -96.769659,
+    "approx": false
+  },
+  {
+    "id": 4,
+    "name": "LTD West Commerce",
+    "address": "200 W Commerce St, Dallas, TX 75208",
+    "lat": 32.774296,
+    "lng": -96.825177,
+    "approx": false
+  },
+  {
+    "id": 5,
+    "name": "Haven at Chisholm Trail",
+    "address": "3400 Summer Creek Dr, Fort Worth, TX 76123",
+    "lat": 32.603689,
+    "lng": -97.40703,
+    "approx": false
+  },
+  {
+    "id": 6,
+    "name": "400 North Ervay",
+    "address": "400 N Ervay St, Dallas, TX 75201",
+    "lat": 32.783804,
+    "lng": -96.79824,
+    "approx": false
+  },
+  {
+    "id": 7,
+    "name": "Ascend at McKinney North",
+    "address": "3000 W Eldorado Pkwy, McKinney, TX 75070",
+    "lat": 33.175241,
+    "lng": -96.727786,
+    "approx": false
+  },
+  {
+    "id": 8,
+    "name": "District at Greenville",
+    "address": "9555 Forest Ln, Dallas, TX 75243",
+    "lat": 32.910534,
+    "lng": -96.728795,
+    "approx": false
+  },
+  {
+    "id": 9,
+    "name": "Richland Park",
+    "address": "2200 N Central Expy, Richardson, TX 75080",
+    "lat": 32.978255,
+    "lng": -96.715341,
+    "approx": false
+  },
+  {
+    "id": 10,
+    "name": "Woodlands of Plano",
+    "address": "7400 W Park Blvd, Plano, TX 75093",
+    "lat": 33.026928,
+    "lng": -96.789233,
+    "approx": false
+  },
+  {
+    "id": 11,
+    "name": "Layers Galleria",
+    "address": "5051 Westheimer Rd, Houston, TX 77056",
+    "lat": 29.738415,
+    "lng": -95.461442,
+    "approx": false
+  },
+  {
+    "id": 12,
+    "name": "301 Greenville",
+    "address": "301 Greenville Ave, Allen, TX 75002",
+    "lat": 33.105171,
+    "lng": -96.659222,
+    "approx": false
+  },
+  {
+    "id": 13,
+    "name": "660 Yorktown",
+    "address": "660 Yorktown Dr, Dallas, TX 75208",
+    "lat": 32.7551031,
+    "lng": -96.8391046,
+    "approx": true
+  },
+  {
+    "id": 14,
+    "name": "Skyline Farmers Market",
+    "address": "3000 Gulden Ln, Dallas, TX 75212",
+    "lat": 32.779278,
+    "lng": -96.827609,
+    "approx": false
+  },
+  {
+    "id": 15,
+    "name": "Cyrene Painted Tree",
+    "address": "7100 Painted Tree Pkwy, McKinney, TX 75070",
+    "lat": 33.19765,
+    "lng": -96.615447,
+    "approx": true
+  },
+  {
+    "id": 16,
+    "name": "Union River East",
+    "address": "2600 Montgomery St, Fort Worth, TX 76107",
+    "lat": 32.734272,
+    "lng": -97.370059,
+    "approx": false
+  },
+  {
+    "id": 17,
+    "name": "Republic House at Frisco Bridges",
+    "address": "3900 Bridge St, Frisco, TX 75034",
+    "lat": 33.144746,
+    "lng": -96.776212,
+    "approx": false
+  },
+  {
+    "id": 18,
+    "name": "Park 7 + Palmer",
+    "address": "6740 Bertner Ave, Houston, TX 77030",
+    "lat": 29.706412,
+    "lng": -95.399205,
+    "approx": false
+  },
+  {
+    "id": 19,
+    "name": "Legacy at Crowley",
+    "address": "1200 Crowley Rd, Crowley, TX 76036",
+    "lat": 32.560474,
+    "lng": -97.353799,
+    "approx": false
+  },
+  {
+    "id": 20,
+    "name": "Valor at the Realm",
+    "address": "2900 The Realm Pkwy, Lewisville, TX 75056",
+    "lat": 33.046233,
+    "lng": -96.994174,
+    "approx": true
+  },
+  {
+    "id": 21,
+    "name": "The Delegate at City Point",
+    "address": "7940 N Davis Blvd, North Richland Hills, TX 76182",
+    "lat": 32.9054,
+    "lng": -97.192592,
+    "approx": false
+  },
+  {
+    "id": 22,
+    "name": "The Jordan by Windsor",
+    "address": "2401 Victory Park Ln, Dallas, TX 75219",
+    "lat": 32.787731,
+    "lng": -96.809969,
+    "approx": false
+  },
+  {
+    "id": 23,
+    "name": "Magnolia Galleria",
+    "address": "5000 Westheimer Rd, Houston, TX 77056",
+    "lat": 29.742704,
+    "lng": -95.462825,
+    "approx": false
+  },
+  {
+    "id": 24,
+    "name": "Promenade at Las Colinas",
+    "address": "5000 N MacArthur Blvd, Irving, TX 75038",
+    "lat": 32.87516,
+    "lng": -96.962588,
+    "approx": false
+  },
+  {
+    "id": 25,
+    "name": "Eastshore on Lake Carolyn",
+    "address": "800 Lake Carolyn Pkwy, Irving, TX 75039",
+    "lat": 32.865356,
+    "lng": -96.930058,
+    "approx": false
+  },
+  {
+    "id": 26,
+    "name": "Riachi at One 21",
+    "address": "3400 Dallas Pkwy, Plano, TX 75093",
+    "lat": 33.022268,
+    "lng": -96.829254,
+    "approx": false
+  },
+  {
+    "id": 27,
+    "name": "Summers Crossing",
+    "address": "4100 Coit Rd, Plano, TX 75023",
+    "lat": 33.047984,
+    "lng": -96.770539,
+    "approx": false
+  },
+  {
+    "id": 28,
+    "name": "Madera Leftbank",
+    "address": "3600 W 7th St, Fort Worth, TX 76107",
+    "lat": 32.751736,
+    "lng": -97.370136,
+    "approx": false
+  },
+  {
+    "id": 29,
+    "name": "The Braden on 5th",
+    "address": "4324 5th Ave, Fort Worth, TX 76107",
+    "lat": 32.684385,
+    "lng": -97.339379,
+    "approx": false
+  },
+  {
+    "id": 30,
+    "name": "The Ellis",
+    "address": "5601 Destination Way, The Colony, TX 75056",
+    "lat": 33.089009,
+    "lng": -96.886392,
+    "approx": true
+  },
+  {
+    "id": 31,
+    "name": "The Brook",
+    "address": "8500 Teel Pkwy, Frisco, TX 75035",
+    "lat": 33.149151,
+    "lng": -96.86297,
+    "approx": false
+  },
+  {
+    "id": 32,
+    "name": "McKinney Square",
+    "address": "601 N Hardin Blvd, McKinney, TX 75069",
+    "lat": 33.196549,
+    "lng": -96.665796,
+    "approx": false
+  },
+  {
+    "id": 33,
+    "name": "Homes of Prairie Springs",
+    "address": "3001 E Trinity Mills Rd, Richardson, TX 75082",
+    "lat": 32.948179,
+    "lng": -96.729721,
+    "approx": true
+  },
+  {
+    "id": 34,
+    "name": "Aura Avant",
+    "address": "2500 Corporate Dr, Lewisville, TX 75067",
+    "lat": 33.022847,
+    "lng": -96.971246,
+    "approx": false
+  },
+  {
+    "id": 35,
+    "name": "The District at Collins",
+    "address": "800 E Collins Blvd, Richardson, TX 75081",
+    "lat": 32.967914,
+    "lng": -96.715184,
+    "approx": false
+  },
+  {
+    "id": 36,
+    "name": "Crystal Springs",
+    "address": "7000 Oakmont Blvd, Fort Worth, TX 76132",
+    "lat": 32.661705,
+    "lng": -97.42183,
+    "approx": false
+  },
+  {
+    "id": 37,
+    "name": "Cortland Las Colinas",
+    "address": "6400 N MacArthur Blvd, Irving, TX 75039",
+    "lat": 32.896076,
+    "lng": -96.958634,
+    "approx": false
+  },
+  {
+    "id": 38,
+    "name": "Sylvan Thirty",
+    "address": "3209 Sylvester St, Dallas, TX 75212",
+    "lat": 32.812372,
+    "lng": -96.82702,
+    "approx": false
+  },
+  {
+    "id": 39,
+    "name": "Park West",
+    "address": "3109 Douglas Ave, Dallas, TX 75219",
+    "lat": 32.813795,
+    "lng": -96.813299,
+    "approx": false
+  },
+  {
+    "id": 40,
+    "name": "Depot on Main",
+    "address": "125 N Main Street, Burleson, TX 76028",
+    "lat": 32.543357,
+    "lng": -97.321158,
+    "approx": false
+  },
+  {
+    "id": 41,
+    "name": "North Park Landing",
+    "address": "4500 N Main St, Fort Worth, TX 76106",
+    "lat": 32.824293,
+    "lng": -97.354735,
+    "approx": false
+  },
+  {
+    "id": 42,
+    "name": "IMT Prestonwood",
+    "address": "15200 Addison Rd, Addison, TX 75001",
+    "lat": 32.956539,
+    "lng": -96.829293,
+    "approx": false
+  },
+  {
+    "id": 43,
+    "name": "Ardan West Village",
+    "address": "3600 N Hall St, Dallas, TX 75219",
+    "lat": 32.808636,
+    "lng": -96.805503,
+    "approx": false
+  },
+  {
+    "id": 44,
+    "name": "The Ellington",
+    "address": "5701 Legacy Dr, Plano, TX 75024",
+    "lat": 33.078123,
+    "lng": -96.817295,
+    "approx": false
+  },
+  {
+    "id": 45,
+    "name": "29Fifty",
+    "address": "2950 N MacArthur Blvd, Irving, TX 75062",
+    "lat": 32.846707,
+    "lng": -96.958972,
+    "approx": false
+  },
+  {
+    "id": 46,
+    "name": "Premier at Prestonwood",
+    "address": "15503 Addison Rd, Addison, TX 75001",
+    "lat": 32.959802,
+    "lng": -96.82976,
+    "approx": false
+  },
+  {
+    "id": 47,
+    "name": "Uptown Trail",
+    "address": "2200 Howell St, Dallas, TX 75204",
+    "lat": 32.798855,
+    "lng": -96.802724,
+    "approx": false
+  },
+  {
+    "id": 48,
+    "name": "Lucia",
+    "address": "9500 Warren Pkwy, Frisco, TX 75035",
+    "lat": 33.108993,
+    "lng": -96.788204,
+    "approx": false
+  },
+  {
+    "id": 49,
+    "name": "Project Alpha - The Abbott",
+    "address": "Dallas, TX",
+    "lat": 32.776272,
+    "lng": -96.796856,
+    "approx": true
+  },
+  {
+    "id": 50,
+    "name": "Project Alpha - The Abigail",
+    "address": "Dallas, TX",
+    "lat": 32.776272,
+    "lng": -96.796856,
+    "approx": true
+  },
+  {
+    "id": 51,
+    "name": "Project Alpha - The Abram",
+    "address": "Dallas, TX",
+    "lat": 32.776272,
+    "lng": -96.796856,
+    "approx": true
+  },
+  {
+    "id": 52,
+    "name": "Project Alpha - The Adriane",
+    "address": "Dallas, TX",
+    "lat": 32.776272,
+    "lng": -96.796856,
+    "approx": true
+  },
+  {
+    "id": 53,
+    "name": "Project Alpha - The Alona",
+    "address": "Dallas, TX",
+    "lat": 32.776272,
+    "lng": -96.796856,
+    "approx": true
+  },
+  {
+    "id": 54,
+    "name": "Jovia",
+    "address": "1800 NE Green Oaks Blvd, Arlington, TX 76006",
+    "lat": 32.784913,
+    "lng": -97.06398,
+    "approx": false
+  },
+  {
+    "id": 55,
+    "name": "Cortland Macarthur",
+    "address": "6350 N MacArthur Blvd, Irving, TX 75039",
+    "lat": 32.896503,
+    "lng": -96.959021,
+    "approx": false
+  },
+  {
+    "id": 56,
+    "name": "South 400",
+    "address": "400 Commerce St, Fort Worth, TX 76102",
+    "lat": 32.754904,
+    "lng": -97.33073,
+    "approx": false
+  },
+  {
+    "id": 57,
+    "name": "Longhorn Crossing",
+    "address": "4100 Old Granbury Rd, Fort Worth, TX 76133",
+    "lat": 32.661618,
+    "lng": -97.397036,
+    "approx": false
+  },
+  {
+    "id": 58,
+    "name": "AMLI at Escena",
+    "address": "6401 Escena Blvd, Irving, TX 75039",
+    "lat": 32.896049,
+    "lng": -96.942662,
+    "approx": false
+  },
+  {
+    "id": 59,
+    "name": "Cortland Stonebriar",
+    "address": "4400 Stonebriar Cir, Frisco, TX 75034",
+    "lat": 33.1506,
+    "lng": -96.823818,
+    "approx": true
+  },
+  {
+    "id": 60,
+    "name": "Cortland Chisholm Trail",
+    "address": "9400 Trail Lake Dr, Fort Worth, TX 76123",
+    "lat": 32.632562,
+    "lng": -97.399386,
+    "approx": false
+  },
+  {
+    "id": 61,
+    "name": "Modera Walsh",
+    "address": "700 Walsh Ranch Pkwy, Aledo, TX 76008",
+    "lat": 32.697994,
+    "lng": -97.603994,
+    "approx": true
+  },
+  {
+    "id": 62,
+    "name": "Vantage at Spring Creek",
+    "address": "1500 Spring Creek Pkwy, Plano, TX 75023",
+    "lat": 33.056379,
+    "lng": -96.718965,
+    "approx": false
+  },
+  {
+    "id": 63,
+    "name": "Horizon at Premier",
+    "address": "4800 Premier Dr, Plano, TX 75024",
+    "lat": 33.043871,
+    "lng": -96.704999,
+    "approx": false
+  },
+  {
+    "id": 64,
+    "name": "Chapel Hill",
+    "address": "1500 W Round Grove Rd, Lewisville, TX 75067",
+    "lat": 33.005804,
+    "lng": -97.012435,
+    "approx": false
+  },
+  {
+    "id": 65,
+    "name": "Dayrise at Centreport",
+    "address": "3100 Airport Fwy, Fort Worth, TX 76111",
+    "lat": 32.767232,
+    "lng": -97.302426,
+    "approx": false
+  },
+  {
+    "id": 66,
+    "name": "The Moderne",
+    "address": "4300 Camp Bowie Blvd, Fort Worth, TX 76107",
+    "lat": 32.742437,
+    "lng": -97.382859,
+    "approx": false
+  },
+  {
+    "id": 67,
+    "name": "Ladera Apartments",
+    "address": "3939 E Trinity Mills Rd, Dallas, TX 75287",
+    "lat": 32.987116,
+    "lng": -96.845778,
+    "approx": false
+  },
+  {
+    "id": 68,
+    "name": "Mylo Apartments",
+    "address": "800 W Magnolia Ave, Fort Worth, TX 76104",
+    "lat": 32.731038,
+    "lng": -97.332809,
+    "approx": false
+  },
+  {
+    "id": 69,
+    "name": "Jasmine Apartments",
+    "address": "6400 Davis Blvd, North Richland Hills, TX 76182",
+    "lat": 32.9054,
+    "lng": -97.192592,
+    "approx": false
+  },
+  {
+    "id": 70,
+    "name": "The Arts Apartments",
+    "address": "1505 Elm St, Dallas, TX 75201",
+    "lat": 32.781622,
+    "lng": -96.799581,
+    "approx": false
+  },
+  {
+    "id": 71,
+    "name": "Prescott Park",
+    "address": "8951 Randol Mill, Fort Worth, TX 76120",
+    "lat": 32.762114,
+    "lng": -97.158761,
+    "approx": false
+  },
+  {
+    "id": 72,
+    "name": "Eleven11 Lexington at Flower Mound",
+    "address": "1111 Lexington Ave, Flower Mound, TX 75028",
+    "lat": 33.005189,
+    "lng": -97.052576,
+    "approx": false
+  },
+  {
+    "id": 73,
+    "name": "Theo Allen Gateway",
+    "address": "2014 Southside Blvd, Allen, TX",
+    "lat": 33.103174,
+    "lng": -96.67055,
+    "approx": true
+  },
+  {
+    "id": 74,
+    "name": "800 Link",
+    "address": "800 Link Dr, Duncanville, TX 75116",
+    "lat": 32.664963,
+    "lng": -96.913218,
+    "approx": false
+  },
+  {
+    "id": 75,
+    "name": "Whitney Uptown",
+    "address": "3227 McKinney Ave, Dallas, TX 75204",
+    "lat": 32.804008,
+    "lng": -96.799982,
+    "approx": false
+  },
+  {
+    "id": 76,
+    "name": "Devon On Northgate",
+    "address": "4013 Northgate Drive, Dallas, TX 75062",
+    "lat": 32.856877,
+    "lng": -97.005232,
+    "approx": false
+  },
+  {
+    "id": 77,
+    "name": "Meadows on Amanda Lane",
+    "address": "11330 Amanda Ln, Dallas, TX 75238",
+    "lat": 32.875192,
+    "lng": -96.688911,
+    "approx": false
+  },
+  {
+    "id": 78,
+    "name": "Artistry at Craig Ranch",
+    "address": "5370 Piper Glen Road, McKinney, TX 75070",
+    "lat": 33.138708,
+    "lng": -96.729217,
+    "approx": false
+  },
+  {
+    "id": 79,
+    "name": "Republic East and West",
+    "address": "245 E Interstate 30, Garland, TX 75043",
+    "lat": 32.846641,
+    "lng": -96.578153,
+    "approx": false
+  },
+  {
+    "id": 80,
+    "name": "Villa Del Mar",
+    "address": "5234 Villa Del Mar Ave, Arlington, TX 76017",
+    "lat": 32.661473,
+    "lng": -97.130771,
+    "approx": false
+  },
+  {
+    "id": 81,
+    "name": "Chimney Hill",
+    "address": "9637 Forest Ln, Richardson, TX 75243",
+    "lat": 32.995996,
+    "lng": -96.732701,
+    "approx": false
+  },
+  {
+    "id": 82,
+    "name": "Jefferson Grandscape",
+    "address": "4050 Destination Dr, The Colony, TX 75056",
+    "lat": 33.068364,
+    "lng": -96.861077,
+    "approx": false
+  },
+  {
+    "id": 83,
+    "name": "Falls on Clearwood",
+    "address": "613 Clearwood Drive, Richardson, TX 75081",
+    "lat": 32.936543,
+    "lng": -96.746566,
+    "approx": false
+  },
+  {
+    "id": 84,
+    "name": "Lakeside Villas",
+    "address": "2502 Riverside Dr, Grand Prairie, TX 75050",
+    "lat": 32.804765,
+    "lng": -97.056318,
+    "approx": false
+  },
+  {
+    "id": 85,
+    "name": "Timberlinks at Denton",
+    "address": "5201 Par Drive, Denton, TX 76208",
+    "lat": 33.179413,
+    "lng": -97.076491,
+    "approx": false
+  },
+  {
+    "id": 86,
+    "name": "The Regent",
+    "address": "17717 Preston Road, Dallas, TX 75252",
+    "lat": 32.997919,
+    "lng": -96.800375,
+    "approx": false
+  },
+  {
+    "id": 87,
+    "name": "Laurel Heights at Cityview",
+    "address": "5701 Overton Ridge Blvd, Fort Worth, TX 76132",
+    "lat": 32.675647,
+    "lng": -97.413881,
+    "approx": false
+  },
+  {
+    "id": 88,
+    "name": "The Mustang",
+    "address": "601 E Las Colinas Blvd, Irving, TX 75039",
+    "lat": 32.861697,
+    "lng": -96.930505,
+    "approx": false
+  },
+  {
+    "id": 89,
+    "name": "2201 Creekview",
+    "address": "2201 Creekview, Waco, TX",
+    "lat": 31.504449,
+    "lng": -97.150303,
+    "approx": false
+  },
+  {
+    "id": 90,
+    "name": "The Waverly",
+    "address": "1700 Fairfield Pkwy, Burleson, TX 76028",
+    "lat": 32.542082,
+    "lng": -97.320849,
+    "approx": true
+  },
+  {
+    "id": 91,
+    "name": "Alexan Galleria",
+    "address": "13970 Noel Road, Dallas, TX 75240",
+    "lat": 32.937805,
+    "lng": -96.817782,
+    "approx": false
+  },
+  {
+    "id": 92,
+    "name": "Villas at Bardin",
+    "address": "2914 Spinner Lane, Arlington, TX",
+    "lat": 32.735582,
+    "lng": -97.107119,
+    "approx": true
+  },
+  {
+    "id": 93,
+    "name": "Summit Ridge Apartments",
+    "address": "1070 Grandys Lane, Lewisville, TX 75077",
+    "lat": 33.06362,
+    "lng": -97.018306,
+    "approx": false
+  },
+  {
+    "id": 94,
+    "name": "Jefferson Railhead",
+    "address": "10221 Whistlestop Lane, Frisco, TX 75033",
+    "lat": 33.1506,
+    "lng": -96.823818,
+    "approx": true
+  },
+  {
+    "id": 95,
+    "name": "Neuhaus Lake Worth",
+    "address": "6201 Azle Avenue, Lake Worth, TX 76135",
+    "lat": 32.815626,
+    "lng": -97.422221,
+    "approx": false
+  },
+  {
+    "id": 96,
+    "name": "3700M",
+    "address": "3700 McKinney Avenue, Dallas, TX 75204",
+    "lat": 32.80791,
+    "lng": -96.796565,
+    "approx": false
+  },
+  {
+    "id": 97,
+    "name": "Ascent Victory Park",
+    "address": "2588 N Houston St, Dallas, TX 75219",
+    "lat": 32.789668,
+    "lng": -96.808985,
+    "approx": false
+  },
+  {
+    "id": 98,
+    "name": "Maple Terrace",
+    "address": "3001 Maple Avenue, Dallas, TX 75201",
+    "lat": 32.798111,
+    "lng": -96.80736,
+    "approx": false
+  }
+];
+
+function esriTile(lat, lng, z){
+  const n = Math.pow(2, z);
+  const lr = lat * Math.PI/180;
+  const x = Math.floor((lng+180)/360*n);
+  const y = Math.floor((1 - Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n);
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+}
+
+async function fetchGooglePhoto(textQuery){
+  try {
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Goog-Api-Key':GKEY,'X-Goog-FieldMask':'places.photos'},
+      body: JSON.stringify({textQuery, pageSize:1}),
+    });
+    if(!res.ok) return null;
+    const json = await res.json();
+    const photoName = json?.places?.[0]?.photos?.[0]?.name;
+    if(!photoName) return null;
+    return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=300&key=${GKEY}`;
+  } catch { return null; }
+}
+
+function applyMapPhoto(id, url){
+  const img = document.querySelector(`#mapthumb-${id}`);
+  if(!img) return;
+  const fresh = new Image();
+  fresh.onload = () => { img.src = url; img.classList.remove('loading'); };
+  fresh.onerror = () => { img.classList.remove('loading'); };
+  fresh.src = url;
+}
+
+const mapDelay = ms => new Promise(r => setTimeout(r, ms));
+
+async function loadMapPhotos(){
+  for(let i=0;i<MAP_ITEMS.length;i++){
+    const item = MAP_ITEMS[i];
+    (async () => {
+      await mapDelay(i*90);
+      const url = await fetchGooglePhoto(`${item.name} ${item.address}`);
+      if(url) applyMapPhoto(item.id, url);
+    })();
+  }
+}
+
+const leafletMap = L.map('map', {zoomControl:true});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; <a href="https://carto.com/">CARTO</a> &copy; OSM', subdomains:'abcd', maxZoom:19,
+}).addTo(leafletMap);
+
+const bounds = L.latLngBounds(MAP_ITEMS.map(i => [i.lat, i.lng]));
+leafletMap.fitBounds(bounds, {padding:[40,40]});
+
+const clusterGroup = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  iconCreateFunction: function(cluster){
+    const count = cluster.getChildCount();
+    const size = count > 20 ? 44 : count > 8 ? 38 : 32;
+    return L.divIcon({
+      html:`<div class="marker-cluster-custom" style="width:${size}px;height:${size}px;">${count}</div>`,
+      className:'', iconSize:[size,size],
+    });
+  },
+});
+
+let mapSelected = null;
+const mapMarkers = {};
+
+function mapPillIcon(item, sel){
+  const cls = 'map-pill' + (item.approx ? ' approx' : '') + (sel ? ' sel' : '');
+  return L.divIcon({ html:`<div class="${cls}">${item.id}</div>`, className:'', iconSize:[0,0], iconAnchor:[0,0] });
+}
+
+function selectMapItem(id){
+  if(mapSelected !== null){
+    const prev = MAP_ITEMS.find(x => String(x.id)===String(mapSelected));
+    if(prev && mapMarkers[prev.id]) mapMarkers[prev.id].setIcon(mapPillIcon(prev,false));
+    const pc = document.querySelector(`.map-card[data-id="${mapSelected}"]`);
+    if(pc) pc.classList.remove('selected');
+  }
+  mapSelected = id;
+  if(id === null) return;
+  const item = MAP_ITEMS.find(x => String(x.id)===String(id));
+  if(!item) return;
+  if(mapMarkers[item.id]) mapMarkers[item.id].setIcon(mapPillIcon(item,true));
+  const card = document.querySelector(`.map-card[data-id="${id}"]`);
+  if(card){ card.classList.add('selected'); card.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+  clusterGroup.zoomToShowLayer(mapMarkers[item.id], () => {
+    leafletMap.panTo([item.lat, item.lng], {animate:true, duration:0.5});
+  });
+}
+leafletMap.on('click', () => selectMapItem(null));
+
+function buildMapMarker(item){
+  const m = L.marker([item.lat, item.lng], {icon:mapPillIcon(item,false)});
+  mapMarkers[item.id] = m;
+  m.on('click', e => { L.DomEvent.stopPropagation(e); selectMapItem(String(item.id)); });
+  clusterGroup.addLayer(m);
+}
+
+function buildMapCard(item){
+  const fb = esriTile(item.lat, item.lng, 16);
+  const card = document.createElement('div');
+  card.className = 'map-card';
+  card.dataset.id = item.id;
+  card.dataset.search = `${item.name} ${item.address}`.toLowerCase();
+  card.innerHTML = `
+    <div class="thumb"><img id="mapthumb-${item.id}" src="${fb}" class="loading" alt="${item.name}"></div>
+    <div class="info">
+      <div class="mc-name">#${item.id} ${item.name}</div>
+      <div class="mc-sub">${item.address}</div>
+      ${item.approx ? '<div class="mc-flag">approx.</div>' : ''}
+    </div>`;
+  card.addEventListener('click', () => selectMapItem(String(item.id)));
+  return card;
+}
+
+const mapList = document.getElementById('mapList');
+const sidebarCount = document.getElementById('sidebarCount');
+MAP_ITEMS.forEach(item => {
+  buildMapMarker(item);
+  mapList.appendChild(buildMapCard(item));
+});
+leafletMap.addLayer(clusterGroup);
+sidebarCount.textContent = `${MAP_ITEMS.length} properties`;
+
+const filterInput = document.getElementById('filterInput');
+filterInput.addEventListener('input', () => {
+  const q = filterInput.value.trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('.map-card').forEach(card => {
+    const match = !q || card.dataset.search.includes(q);
+    card.classList.toggle('hidden', !match);
+    if(match) visible++;
+  });
+  sidebarCount.textContent = q ? `${visible} of ${MAP_ITEMS.length} properties` : `${MAP_ITEMS.length} properties`;
+});
+
+loadMapPhotos();
+</script>
