@@ -1065,7 +1065,10 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 }).addTo(leafletMap);
 
 const bounds = L.latLngBounds(MAP_ITEMS.map(i => [i.lat, i.lng]));
-leafletMap.fitBounds(bounds, {padding:[40,40]});
+requestAnimationFrame(() => {
+  leafletMap.invalidateSize();
+  leafletMap.fitBounds(bounds, {padding:[40,40]});
+});
 
 const clusterGroup = L.markerClusterGroup({
   maxClusterRadius: 50,
